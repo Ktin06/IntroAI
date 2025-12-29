@@ -160,7 +160,7 @@ function handleMapClick(latLng) {
 function renderMap() {
     clearMap();
     
-    // Draw all ways
+    // Draw all ways (background roads)
     ways.forEach(way => {
         const path = [];
         way.nodes.forEach(nodeId => {
@@ -170,13 +170,11 @@ function renderMap() {
         
         if (path.length < 2) return;
         
-        const isInPath = currentPath && currentPath.ways.some(w => w.id === way.id);
-        
         const polyline = new google.maps.Polyline({
             path: path,
-            strokeColor: isInPath ? '#3b82f6' : conditions[way.condition].color,
-            strokeOpacity: isInPath ? 1 : 0.6,
-            strokeWeight: isInPath ? 6 : 3,
+            strokeColor: conditions[way.condition].color,
+            strokeOpacity: 0.6,
+            strokeWeight: 3,
             map: map
         });
         
@@ -191,6 +189,28 @@ function renderMap() {
         
         polylines.push(polyline);
     });
+    
+    // Draw the selected path on top (only the specific edges used)
+    if (currentPath && currentPath.edges) {
+        currentPath.edges.forEach(edge => {
+            const fromNode = nodes[edge.from];
+            const toNode = nodes[edge.to];
+            if (fromNode && toNode) {
+                const pathPolyline = new google.maps.Polyline({
+                    path: [
+                        { lat: fromNode.lat, lng: fromNode.lon },
+                        { lat: toNode.lat, lng: toNode.lon }
+                    ],
+                    strokeColor: '#3b82f6',
+                    strokeOpacity: 1,
+                    strokeWeight: 6,
+                    map: map,
+                    zIndex: 1000
+                });
+                polylines.push(pathPolyline);
+            }
+        });
+    }
 }
 
 function clearMap() {
@@ -281,18 +301,20 @@ function aStarSearch(startId, goalId) {
 
 function reconstructPath(cameFrom, current, totalTime) {
     const pathNodes = [current];
+    const pathEdges = [];
     const pathWays = [];
     let totalDistance = 0;
     
     while (cameFrom[current]) {
         const prev = cameFrom[current];
         pathNodes.unshift(prev.node);
+        pathEdges.unshift(prev.edge);
         pathWays.unshift(prev.edge.way);
         totalDistance += prev.edge.distance;
         current = prev.node;
     }
     
-    return { nodes: pathNodes, ways: pathWays, distance: totalDistance, time: totalTime };
+    return { nodes: pathNodes, edges: pathEdges, ways: pathWays, distance: totalDistance, time: totalTime };
 }
 
 function clearSelection() {
